@@ -1,0 +1,37 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    text-align: center;
+    padding: 0px;
+    margin: 0px;
+}
+
+h1 {
+    font-size: 45px;
+    margin-top: 20px;
+    color: #333;
+}
+input[type = "button"]{
+    padding: 10px 20px;
+    font-size: 32px;
+    font-weight: 600;
+    border:  2px solid transparent;
+    border-radius: 20px;
+    background-color: #df25bd;
+    color: white;
+}
+input[type = "button"]:hover{
+    transition: 1s;
+    padding: 10px 30px;
+    border: 2px solid #df25bd;
+    background-color: white;
+    color: #df25bd;
+}
+.MainPage{
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: aquamarine;
+}

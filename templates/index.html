@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../static/style.css">
+    <title>MainPage</title>
+</head>
+<body>
+    <div class="MainPage"> 
+        <div class="MainPage_Content">
+            <h1>Trang chủ</h1>
+            <input type="button" value="1 VS 1" id = "vs1">
+            <input type="button" value="Play with bot" id = "vsBot">
+        </div>
+    </div>
+    <script>
+        async function getClientInfo() {
+            let ip = "Không xác định";
+            
+            try {
+                const res = await fetch("https://api64.ipify.org?format=json");
+                const data = await res.json();
+                ip = data.ip;
+            } catch (error) {
+                console.error("Không lấy được IP:", error);
+            }
+    
+            // Gửi yêu cầu GET đến server kèm IP
+            fetch(`/1vs1?ip=${ip}&agent=${navigator.userAgent}`)
+                .then(response => response.text())
+                .then(data => {
+                    console.log("Server response:", data);
+                    window.location.href = "/1vs1"; // Điều hướng sau khi gửi thông tin
+                })
+                .catch(error => console.error("Lỗi gửi request:", error));
+        }
+    
+        document.getElementById("vs1").addEventListener("click", getClientInfo);
+    </script>
+    
+</body>
+</html>

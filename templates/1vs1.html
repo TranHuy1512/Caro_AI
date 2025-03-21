@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bàn Cờ Caro</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f8f8f8;
+        }
+        .board {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(10, 40px);
+            grid-template-rows: repeat(10, 40px);
+            gap: 2px;
+            background-color: black;
+            padding: 5px;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        .win-line {
+            position: absolute;
+            background-color: red;
+            height: 5px;
+            transform-origin: left;
+        }
+        #resetBtn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="board" id="board"></div>
+    <button id="resetBtn">Chơi lại</button>
+    <script>
+        const board = document.getElementById("board");
+        const resetBtn = document.getElementById("resetBtn");
+        const cellSize = 40;
+        const gapSize = 2;
+        const totalSize = cellSize + gapSize;
+        let gameOver = false;
+
+        for (let i = 0; i < 100; i++) {
+            let cell = document.createElement("div");
+            cell.classList.add("cell");
+            let row = Math.floor(i / 10) + 1;
+            let col = (i % 10) + 1;
+            cell.dataset.row = row;
+            cell.dataset.col = col;
+            cell.addEventListener("click", async function() {
+                if (gameOver || cell.textContent) return;
+                
+                let response = await fetch("/1vs1/play", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ row, col })
+                });
+                
+                let result = await response.json();
+                if (result.point) {
+                    cell.textContent = result.point;
+                }
+                if (result.win === 2 || result.win === 3) {
+                    gameOver = true;
+                    setTimeout(() => {
+                        drawWinLine(result.win_cells);
+                        alert(result.win === 2 ? "X thắng!" : "O thắng!");
+                        resetBtn.style.display = "block";
+                    }, 100);
+                }
+            });
+            board.appendChild(cell);
+        }
+
+        function drawWinLine(winCells) {
+            if (!winCells || winCells.length !== 5) return;
+
+            let [startRow, startCol] = winCells[0];
+            let [endRow, endCol] = winCells[4];
+
+            let startX = (startCol - 1) * totalSize + cellSize / 2 + 5;
+            let startY = (startRow - 1) * totalSize + cellSize / 2 + 5;
+            let endX = (endCol - 1) * totalSize + cellSize / 2 + 5;
+            let endY = (endRow - 1) * totalSize + cellSize / 2 + 5;
+
+            let dx = endX - startX;
+            let dy = endY - startY;
+            let length = Math.sqrt(dx * dx + dy * dy);
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+            let line = document.createElement("div");
+            line.classList.add("win-line");
+            line.style.width = length + "px";
+            line.style.transform = `rotate(${angle}deg)`;
+            line.style.left = startX + "px";
+            line.style.top = startY + "px";
+
+            board.appendChild(line);
+        }
+
+        resetBtn.addEventListener("click", async () => {
+            // let response = await fetch("/1vs1", {
+            //     method: "GET",
+            //     headers: { "Content-Type": "application/json" }
+            // });
+            
+            // let result = await response.json();
+            // if (result.success) {
+            //     location.reload();
+            // } else {
+            //     alert("Lỗi khi reset ván chơi!");
+            // }
+
+            window.location.href = "/1vs1";
+        });
+    </script>
+</body>
+</html>
