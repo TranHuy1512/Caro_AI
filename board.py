@@ -42,18 +42,88 @@ class BoardState:
         return is_win
 
     def check_five_in_a_row(self):
-        pattern = np.full((5,), 1)
+        """
+        Kiểm tra 5 quân cờ liên tiếp trên bàn cờ 19x19
+        Returns:
+            tuple: (bool, int, list) - (Có thắng không, Người thắng (1: X, 2: O), Danh sách các ô thắng)
+        """
+        # Kiểm tra theo hàng ngang
+        for row in range(19):
+            for col in range(15):  # Chỉ cần kiểm tra đến cột 15 vì sau đó không đủ 5 ô
+                cells = []
+                current = self.values[row][col]
+                if current == 0:  # Bỏ qua ô trống
+                    continue
 
-        black_win, black_cells = self.check_pattern(pattern * piece.BLACK)
-        white_win, white_cells = self.check_pattern(pattern * piece.WHITE)
+                is_five = True
+                for i in range(5):
+                    if self.values[row][col + i] != current:
+                        is_five = False
+                        break
+                    cells.append(row * 19 + (col + i))  # Lưu vị trí ô
 
-        if black_win:
-            self.winner = piece.BLACK
-            return True, piece.BLACK, black_cells
-        if white_win:
-            self.winner = piece.WHITE
-            return True, piece.WHITE, white_cells
-        return False, piece.EMPTY, None
+                if is_five:
+                    self.winner = 2 if current == -1 else 1
+                    return True, self.winner, cells
+
+        # Kiểm tra theo hàng dọc
+        for col in range(19):
+            for row in range(15):  # Chỉ cần kiểm tra đến hàng 15
+                cells = []
+                current = self.values[row][col]
+                if current == 0:
+                    continue
+
+                is_five = True
+                for i in range(5):
+                    if self.values[row + i][col] != current:
+                        is_five = False
+                        break
+                    cells.append((row + i) * 19 + col)
+
+                if is_five:
+                    self.winner = 2 if current == -1 else 1
+                    return True, self.winner, cells
+
+        # Kiểm tra đường chéo chính (từ trái trên xuống phải dưới)
+        for row in range(15):
+            for col in range(15):
+                cells = []
+                current = self.values[row][col]
+                if current == 0:
+                    continue
+
+                is_five = True
+                for i in range(5):
+                    if self.values[row + i][col + i] != current:
+                        is_five = False
+                        break
+                    cells.append((row + i) * 19 + (col + i))
+
+                if is_five:
+                    self.winner = 2 if current == -1 else 1
+                    return True, self.winner, cells
+
+        # Kiểm tra đường chéo phụ (từ phải trên xuống trái dưới)
+        for row in range(15):
+            for col in range(4, 19):
+                cells = []
+                current = self.values[row][col]
+                if current == 0:
+                    continue
+
+                is_five = True
+                for i in range(5):
+                    if self.values[row + i][col - i] != current:
+                        is_five = False
+                        break
+                    cells.append((row + i) * 19 + (col - i))
+
+                if is_five:
+                    self.winner = 2 if current == -1 else 1
+                    return True, self.winner, cells
+
+        return False, 0, []  # Không có người thắng
 
     def is_full(self):
         return not np.any(self.values == piece.EMPTY)

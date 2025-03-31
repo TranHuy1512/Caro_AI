@@ -41,36 +41,44 @@ async def game_1vs1(request: Request):
 async def play(request: Request, move: Move):
     """Xử lý lượt đi của người chơi."""
     try:
+        print("\n=== Debug: Xử lý nước đi của người chơi ===")
+        print(f"Trạng thái game trước khi đi: finished={game.finished}")
+        print(f"Màu hiện tại: {game.state.color}")
+
         # Kiểm tra giới hạn của bàn cờ
         if not (1 <= move.row <= game.size and 1 <= move.col <= game.size):
+            print(f"Lỗi: Nước đi ({move.row}, {move.col}) nằm ngoài bàn cờ")
             return JSONResponse(
                 content={"point": None, "win": 0, "error": "Nước đi nằm ngoài bàn cờ"}
             )
 
-        print(f"Người chơi đi: ({move.row}, {move.col})")  # Log nước đi
+        print(f"Người chơi đi: ({move.row}, {move.col})")
         success = game.play(move.row - 1, move.col - 1)
+        print(f"Kết quả game.play(): {success}")
+        print(f"Trạng thái game sau khi đi: finished={game.finished}")
 
         if not success:
-            print("Nước đi không hợp lệ")  # Log lỗi
+            print("Nước đi không hợp lệ")
             return JSONResponse(
                 content={"point": None, "win": 0, "error": "Nước đi không hợp lệ"}
             )
 
         # Kiểm tra nếu có người thắng
         if game.finished:
-            print(f"Người chơi thắng: {game.state.winner}")  # Log kết quả
+            print(f"Người chơi thắng: {game.state.winner}")
+            print(f"Các ô thắng: {game.state.win_cells}")
             return JSONResponse(
                 content={
                     "point": int(game.state.color),
                     "win": 2 if game.state.winner == 1 else 3,
-                    "win_cells": game.state.win_cells,  # Thêm vị trí của 5 quân thắng
+                    "win_cells": game.state.win_cells,
                 }
             )
 
-        print(f"Lượt tiếp theo: {game.state.color}")  # Log lượt tiếp theo
+        print(f"Lượt tiếp theo: {game.state.color}")
         return JSONResponse(content={"point": int(game.state.color), "win": 0})
     except Exception as e:
-        print(f"Lỗi khi xử lý nước đi: {str(e)}")  # Log lỗi
+        print(f"Lỗi khi xử lý nước đi: {str(e)}")
         return JSONResponse(content={"point": None, "win": 0, "error": "Có lỗi xảy ra"})
 
 
