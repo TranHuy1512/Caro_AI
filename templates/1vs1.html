@@ -1,138 +1,298 @@
 <!DOCTYPE html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bàn Cờ Caro</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bàn Cờ Caro 19x19</title>
     <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f8f8f8;
-        }
-        .board {
-            position: relative;
-            display: grid;
-            grid-template-columns: repeat(10, 40px);
-            grid-template-rows: repeat(10, 40px);
-            gap: 2px;
-            background-color: black;
-            padding: 5px;
-        }
-        .cell {
-            width: 40px;
-            height: 40px;
-            background-color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            position: relative;
-        }
-        .win-line {
-            position: absolute;
-            background-color: red;
-            height: 5px;
-            transform-origin: left;
-        }
-        #resetBtn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            display: none;
-        }
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f8f8f8;
+      }
+      .board {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(19, 40px);
+        grid-template-rows: repeat(19, 40px);
+        gap: 2px;
+        background-color: black;
+        padding: 5px;
+      }
+      .cell {
+        width: 40px;
+        height: 40px;
+        background-color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        position: relative;
+      }
+      .win-line {
+        position: absolute;
+        background-color: red;
+        height: 5px;
+        transform-origin: left;
+        z-index: 1000;
+      }
+      .last-move {
+        background-color: #e6ffe6;
+      }
+      #resetBtn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 18px;
+        cursor: pointer;
+        display: none;
+      }
+      #status {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #333;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="board" id="board"></div>
+    <div id="status"></div>
     <button id="resetBtn">Chơi lại</button>
     <script>
-        const board = document.getElementById("board");
-        const resetBtn = document.getElementById("resetBtn");
-        const cellSize = 40;
-        const gapSize = 2;
-        const totalSize = cellSize + gapSize;
-        let gameOver = false;
+      const board = document.getElementById("board");
+      const resetBtn = document.getElementById("resetBtn");
+      const status = document.getElementById("status");
+      const cellSize = 40;
+      const gapSize = 2;
+      const totalSize = cellSize + gapSize;
+      let gameOver = false;
+      let isBotMode = false;
 
-        for (let i = 0; i < 100; i++) {
-            let cell = document.createElement("div");
-            cell.classList.add("cell");
-            let row = Math.floor(i / 10) + 1;
-            let col = (i % 10) + 1;
-            cell.dataset.row = row;
-            cell.dataset.col = col;
-            cell.addEventListener("click", async function() {
-                if (gameOver || cell.textContent) return;
-                
-                let response = await fetch("/1vs1/play", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ row, col })
-                });
-                
-                let result = await response.json();
-                if (result.point) {
-                    cell.textContent = result.point;
+      // Kiểm tra chế độ chơi
+      const urlParams = new URLSearchParams(window.location.search);
+      isBotMode = urlParams.get("mode") === "bot";
+
+      // Khởi tạo bàn cờ
+      for (let i = 0; i < 19 * 19; i++) {
+        let cell = document.createElement("div");
+        cell.classList.add("cell");
+        let row = Math.floor(i / 19) + 1;
+        let col = (i % 19) + 1;
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.addEventListener("click", handleCellClick);
+        board.appendChild(cell);
+      }
+
+      // Xử lý click vào ô cờ
+      async function handleCellClick() {
+        if (gameOver) {
+          alert(
+            "Ván cờ đã kết thúc! Vui lòng nhấn nút 'Chơi lại' để bắt đầu ván mới."
+          );
+          return;
+        }
+        if (this.textContent) return;
+
+        try {
+          let response = await fetch("/1vs1/play", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              row: parseInt(this.dataset.row),
+              col: parseInt(this.dataset.col),
+            }),
+          });
+
+          let result = await response.json();
+          if (result.point) {
+            // Xóa highlight của nước đi trước
+            const lastMoveCell = document.querySelector(".last-move");
+            if (lastMoveCell) {
+              lastMoveCell.classList.remove("last-move");
+            }
+
+            // Highlight nước đi mới
+            this.classList.add("last-move");
+            this.textContent = result.point === 1 ? "X" : "O";
+            updateStatus(result.point);
+
+            if (result.win === 2 || result.win === 3) {
+              gameOver = true;
+              // Vẽ đường thẳng thắng
+              if (result.win_cells) {
+                drawWinLine(result.win_cells);
+              }
+              // Hiển thị thông báo thắng
+              alert(result.win === 2 ? "X thắng!" : "O thắng!");
+              // Hiển thị nút chơi lại
+              resetBtn.style.display = "block";
+              return; // Kết thúc game ngay lập tức
+            } else if (isBotMode) {
+              setTimeout(handleBotMove, 500);
+            }
+          } else {
+            alert(result.error || "Nước đi không hợp lệ!");
+          }
+        } catch (error) {
+          console.error("Lỗi:", error);
+          alert("Có lỗi xảy ra. Vui lòng thử lại!");
+        }
+      }
+
+      // Xử lý lượt đi của bot
+      async function handleBotMove() {
+        if (gameOver) return;
+
+        try {
+          let response = await fetch("/1vs1/ai-play", {
+            method: "POST",
+          });
+
+          let result = await response.json();
+          if (result.point) {
+            const cell = document.querySelector(
+              `[data-row="${result.row}"][data-col="${result.col}"]`
+            );
+            if (cell) {
+              // Xóa highlight của nước đi trước
+              const lastMoveCell = document.querySelector(".last-move");
+              if (lastMoveCell) {
+                lastMoveCell.classList.remove("last-move");
+              }
+
+              // Highlight nước đi mới
+              cell.classList.add("last-move");
+              cell.textContent = result.point === 1 ? "X" : "O";
+              updateStatus(result.point);
+
+              if (result.win === 2 || result.win === 3) {
+                gameOver = true;
+                // Vẽ đường thẳng thắng
+                if (result.win_cells) {
+                  drawWinLine(result.win_cells);
                 }
-                if (result.win === 2 || result.win === 3) {
-                    gameOver = true;
-                    setTimeout(() => {
-                        drawWinLine(result.win_cells);
-                        alert(result.win === 2 ? "X thắng!" : "O thắng!");
-                        resetBtn.style.display = "block";
-                    }, 100);
-                }
-            });
-            board.appendChild(cell);
+                // Hiển thị thông báo thắng
+                alert(result.win === 2 ? "X thắng!" : "O thắng!");
+                // Hiển thị nút chơi lại
+                resetBtn.style.display = "block";
+                return; // Kết thúc game ngay lập tức
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Lỗi:", error);
+          alert("Có lỗi xảy ra. Vui lòng thử lại!");
+        }
+      }
+
+      // Cập nhật trạng thái game
+      function updateStatus(point) {
+        status.textContent = `Lượt tiếp theo: ${point === 1 ? "O" : "X"}`;
+      }
+
+      function drawWinLine(winCells) {
+        if (!winCells || !Array.isArray(winCells) || winCells.length !== 5) {
+          console.error("Invalid winCells data:", winCells);
+          return;
         }
 
-        function drawWinLine(winCells) {
-            if (!winCells || winCells.length !== 5) return;
+        // Xóa các đường thắng cũ nếu có
+        const oldLines = document.querySelectorAll(".win-line");
+        oldLines.forEach((line) => line.remove());
 
-            let [startRow, startCol] = winCells[0];
-            let [endRow, endCol] = winCells[4];
+        // Lấy tọa độ điểm đầu và điểm cuối
+        const startCell = winCells[0];
+        const endCell = winCells[4];
 
-            let startX = (startCol - 1) * totalSize + cellSize / 2 + 5;
-            let startY = (startRow - 1) * totalSize + cellSize / 2 + 5;
-            let endX = (endCol - 1) * totalSize + cellSize / 2 + 5;
-            let endY = (endRow - 1) * totalSize + cellSize / 2 + 5;
+        // Kiểm tra và chuyển đổi tọa độ nếu cần
+        let startRow, startCol, endRow, endCol;
 
-            let dx = endX - startX;
-            let dy = endY - startY;
-            let length = Math.sqrt(dx * dx + dy * dy);
-            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            let line = document.createElement("div");
-            line.classList.add("win-line");
-            line.style.width = length + "px";
-            line.style.transform = `rotate(${angle}deg)`;
-            line.style.left = startX + "px";
-            line.style.top = startY + "px";
-
-            board.appendChild(line);
+        if (typeof startCell === "object" && startCell !== null) {
+          startRow = startCell.row || startCell[0];
+          startCol = startCell.col || startCell[1];
+        } else {
+          console.error("Invalid start cell format:", startCell);
+          return;
         }
 
-        resetBtn.addEventListener("click", async () => {
-            // let response = await fetch("/1vs1", {
-            //     method: "GET",
-            //     headers: { "Content-Type": "application/json" }
-            // });
-            
-            // let result = await response.json();
-            // if (result.success) {
-            //     location.reload();
-            // } else {
-            //     alert("Lỗi khi reset ván chơi!");
-            // }
+        if (typeof endCell === "object" && endCell !== null) {
+          endRow = endCell.row || endCell[0];
+          endCol = endCell.col || endCell[1];
+        } else {
+          console.error("Invalid end cell format:", endCell);
+          return;
+        }
 
-            window.location.href = "/1vs1";
-        });
+        // Kiểm tra giá trị hợp lệ
+        if (
+          isNaN(startRow) ||
+          isNaN(startCol) ||
+          isNaN(endRow) ||
+          isNaN(endCol)
+        ) {
+          console.error("Invalid coordinates:", {
+            startRow,
+            startCol,
+            endRow,
+            endCol,
+          });
+          return;
+        }
+
+        // Tính toán vị trí pixel
+        let startX = (startCol - 1) * totalSize + cellSize / 2;
+        let startY = (startRow - 1) * totalSize + cellSize / 2;
+        let endX = (endCol - 1) * totalSize + cellSize / 2;
+        let endY = (endRow - 1) * totalSize + cellSize / 2;
+
+        // Tính toán độ dài và góc của đường thẳng
+        let dx = endX - startX;
+        let dy = endY - startY;
+        let length = Math.sqrt(dx * dx + dy * dy);
+        let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        // Tạo và thêm đường thẳng vào bàn cờ
+        let line = document.createElement("div");
+        line.classList.add("win-line");
+        line.style.width = length + "px";
+        line.style.transform = `rotate(${angle}deg)`;
+        line.style.left = startX + "px";
+        line.style.top = startY + "px";
+        line.style.zIndex = "1000";
+
+        board.appendChild(line);
+
+        // Đảm bảo quân cờ thứ 5 được hiển thị
+        const lastCell = document.querySelector(
+          `[data-row="${endRow}"][data-col="${endCol}"]`
+        );
+        if (lastCell) {
+          const point = lastCell.textContent;
+          if (!point) {
+            lastCell.textContent = point === 1 ? "X" : "O";
+          }
+        }
+      }
+
+      resetBtn.addEventListener("click", async () => {
+        try {
+          await fetch("/1vs1/restart", { method: "POST" });
+          window.location.reload();
+        } catch (error) {
+          console.error("Lỗi:", error);
+          alert("Có lỗi xảy ra. Vui lòng thử lại!");
+        }
+      });
+
+      // Nếu chơi với bot và bot đi trước
+      if (isBotMode) {
+        setTimeout(handleBotMove, 500);
+      }
     </script>
-</body>
+  </body>
 </html>
