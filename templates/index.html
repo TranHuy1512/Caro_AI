@@ -1,43 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/style.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/static/style.css" />
     <title>MainPage</title>
-</head>
-<body>
-    <div class="MainPage"> 
-        <div class="MainPage_Content">
-            <h1>Trang chủ</h1>
-            <input type="button" value="1 VS 1" id = "vs1">
-            <input type="button" value="Play with bot" id = "vsBot">
-        </div>
+  </head>
+  <body>
+    <div class="MainPage">
+      <div class="MainPage_Content">
+        <h1>Trang chủ</h1>
+        <input type="button" value="1 VS 1" id="vs1" />
+        <input type="button" value="Play with bot" id="vsBot" />
+      </div>
     </div>
     <script>
-        async function getClientInfo() {
-            let ip = "Không xác định";
-            
-            try {
-                const res = await fetch("https://api64.ipify.org?format=json");
-                const data = await res.json();
-                ip = data.ip;
-            } catch (error) {
-                console.error("Không lấy được IP:", error);
-            }
-    
-            // Gửi yêu cầu GET đến server kèm IP
-            fetch(`/1vs1?ip=${ip}&agent=${navigator.userAgent}`)
-                .then(response => response.text())
-                .then(data => {
-                    console.log("Server response:", data);
-                    window.location.href = "/1vs1"; // Điều hướng sau khi gửi thông tin
-                })
-                .catch(error => console.error("Lỗi gửi request:", error));
+      async function getClientInfo() {
+        let ip = "Không xác định";
+
+        try {
+          const res = await fetch("https://api64.ipify.org?format=json");
+          const data = await res.json();
+          ip = data.ip;
+        } catch (error) {
+          console.error("Không lấy được IP:", error);
         }
-    
-        document.getElementById("vs1").addEventListener("click", getClientInfo);
+
+        // Gửi yêu cầu GET đến server kèm IP
+        try {
+          const response = await fetch(
+            `/1vs1?ip=${ip}&agent=${navigator.userAgent}`
+          );
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          window.location.href = "/1vs1";
+        } catch (error) {
+          console.error("Lỗi chuyển trang:", error);
+          alert("Có lỗi xảy ra khi chuyển trang. Vui lòng thử lại!");
+        }
+      }
+
+      async function playWithBot() {
+        try {
+          window.location.href = "/1vs1?mode=bot";
+        } catch (error) {
+          console.error("Lỗi chuyển trang:", error);
+          alert("Có lỗi xảy ra khi chuyển trang. Vui lòng thử lại!");
+        }
+      }
+
+      document.getElementById("vs1").addEventListener("click", getClientInfo);
+      document.getElementById("vsBot").addEventListener("click", playWithBot);
     </script>
-    
-</body>
+  </body>
 </html>

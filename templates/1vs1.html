@@ -1,138 +1,552 @@
 <!DOCTYPE html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bàn Cờ Caro</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bàn Cờ Caro 19x19</title>
     <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f8f8f8;
-        }
-        .board {
-            position: relative;
-            display: grid;
-            grid-template-columns: repeat(10, 40px);
-            grid-template-rows: repeat(10, 40px);
-            gap: 2px;
-            background-color: black;
-            padding: 5px;
-        }
-        .cell {
-            width: 40px;
-            height: 40px;
-            background-color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            cursor: pointer;
-            border: 1px solid #ccc;
-            position: relative;
-        }
-        .win-line {
-            position: absolute;
-            background-color: red;
-            height: 5px;
-            transform-origin: left;
-        }
-        #resetBtn {
-            margin-top: 20px;
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            display: none;
-        }
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #f8f8f8;
+      }
+      .board {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(19, 40px);
+        grid-template-rows: repeat(19, 40px);
+        gap: 2px;
+        background-color: black;
+        padding: 5px;
+      }
+      .cell {
+        width: 40px;
+        height: 40px;
+        background-color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        position: relative;
+      }
+      .win-line {
+        position: absolute;
+        background-color: red;
+        height: 5px;
+        transform-origin: left;
+        z-index: 1000;
+      }
+      .last-move {
+        background-color: #e6ffe6;
+      }
+      .winning-cell {
+        background-color: #ffeb3b !important;
+        cursor: not-allowed;
+      }
+      #resetBtn {
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 18px;
+        cursor: pointer;
+        display: none;
+      }
+      #status {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #333;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="board" id="board"></div>
+    <div id="status"></div>
     <button id="resetBtn">Chơi lại</button>
     <script>
-        const board = document.getElementById("board");
-        const resetBtn = document.getElementById("resetBtn");
-        const cellSize = 40;
-        const gapSize = 2;
-        const totalSize = cellSize + gapSize;
-        let gameOver = false;
+      const board = document.getElementById("board");
+      const resetBtn = document.getElementById("resetBtn");
+      const status = document.getElementById("status");
+      const cellSize = 40;
+      const gapSize = 2;
+      const totalSize = cellSize + gapSize;
+      let gameOver = false;
+      let isBotMode = false;
+      let isPlayerTurn = true;
 
-        for (let i = 0; i < 100; i++) {
-            let cell = document.createElement("div");
-            cell.classList.add("cell");
-            let row = Math.floor(i / 10) + 1;
-            let col = (i % 10) + 1;
-            cell.dataset.row = row;
-            cell.dataset.col = col;
-            cell.addEventListener("click", async function() {
-                if (gameOver || cell.textContent) return;
-                
-                let response = await fetch("/1vs1/play", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ row, col })
-                });
-                
-                let result = await response.json();
-                if (result.point) {
-                    cell.textContent = result.point;
-                }
-                if (result.win === 2 || result.win === 3) {
-                    gameOver = true;
-                    setTimeout(() => {
-                        drawWinLine(result.win_cells);
-                        alert(result.win === 2 ? "X thắng!" : "O thắng!");
-                        resetBtn.style.display = "block";
-                    }, 100);
-                }
+      // Kiểm tra chế độ chơi
+      const urlParams = new URLSearchParams(window.location.search);
+      isBotMode = urlParams.get("mode") === "bot";
+
+      // Cập nhật trạng thái ban đầu - người chơi luôn đi trước
+      updateStatus(1); // Hiển thị "Lượt tiếp theo: O"
+
+      // Khởi tạo bàn cờ
+      for (let i = 0; i < 19 * 19; i++) {
+        let cell = document.createElement("div");
+        cell.classList.add("cell");
+        let row = Math.floor(i / 19) + 1;
+        let col = (i % 19) + 1;
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.addEventListener("click", handleCellClick);
+        board.appendChild(cell);
+      }
+
+      // Xử lý click vào ô cờ
+      async function handleCellClick() {
+        if (gameOver) {
+          console.log("Game is already over - ignoring click");
+          alert(
+            "Ván cờ đã kết thúc! Vui lòng nhấn nút 'Chơi lại' để bắt đầu ván mới."
+          );
+          return;
+        }
+        if (!isPlayerTurn) {
+          console.log("Not player's turn - ignoring click");
+          alert("Đang là lượt của bot!");
+          return;
+        }
+        if (this.textContent) {
+          console.log("Cell already has content:", this.textContent);
+          return;
+        }
+
+        try {
+          console.log("=== Debug: Xử lý click ô cờ ===");
+          console.log("Game state:", {
+            gameOver,
+            isPlayerTurn,
+            isBotMode,
+          });
+          console.log("Vị trí click:", {
+            row: parseInt(this.dataset.row),
+            col: parseInt(this.dataset.col),
+          });
+
+          let response = await fetch("/1vs1/play", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              row: parseInt(this.dataset.row),
+              col: parseInt(this.dataset.col),
+            }),
+          });
+
+          let result = await response.json();
+          console.log("Server response:", result);
+
+          if (result.point) {
+            console.log("Valid move - updating UI");
+            // Xóa highlight của nước đi trước
+            const lastMoveCell = document.querySelector(".last-move");
+            if (lastMoveCell) {
+              lastMoveCell.classList.remove("last-move");
+            }
+
+            // Highlight nước đi mới và đặt quân cờ
+            this.classList.add("last-move");
+            this.textContent = result.point === 1 ? "X" : "O";
+
+            const lastMove = {
+              row: parseInt(this.dataset.row),
+              col: parseInt(this.dataset.col),
+              piece: result.point === 1 ? "X" : "O",
+            };
+            console.log("Last move:", lastMove);
+
+            // Kiểm tra thắng ngay sau khi đặt quân cờ
+            if (result.win === 2 || result.win === 3) {
+              console.log("Win detected:", {
+                winner: result.win === 2 ? "X" : "O",
+                winCells: result.win_cells,
+                currentGameState: {
+                  gameOver,
+                  isPlayerTurn,
+                  lastMove,
+                },
+              });
+
+              gameOver = true;
+              isPlayerTurn = false;
+
+              if (result.win_cells) {
+                console.log("Drawing win line:", result.win_cells);
+                drawWinLine(result.win_cells, lastMove);
+              }
+
+              setTimeout(() => {
+                alert(result.win === 2 ? "X thắng!" : "O thắng!");
+                resetBtn.style.display = "block";
+              }, 100);
+              return;
+            }
+
+            // Chuyển lượt cho bot nếu đang chơi với bot
+            if (isBotMode && !gameOver) {
+              console.log("Switching to bot's turn");
+              isPlayerTurn = false;
+              updateStatus(result.point);
+              console.log("Scheduling bot move...");
+              setTimeout(handleBotMove, 500);
+            } else {
+              // Chơi 2 người: chuyển lượt bình thường
+              updateStatus(result.point);
+            }
+          } else {
+            console.error("Invalid move:", result.error);
+            alert(result.error || "Nước đi không hợp lệ!");
+          }
+        } catch (error) {
+          console.error("Error in handleCellClick:", error);
+          alert("Có lỗi xảy ra. Vui lòng thử lại!");
+        }
+      }
+
+      // Xử lý lượt đi của bot
+      async function handleBotMove() {
+        if (gameOver) {
+          console.log("Game is over - bot cannot move");
+          return;
+        }
+
+        try {
+          console.log("=== Debug: Bot đang suy nghĩ ===");
+          let response = await fetch("/1vs1/ai-play", {
+            method: "POST",
+          });
+
+          let result = await response.json();
+          console.log("Bot response:", result);
+
+          // Kiểm tra nếu result không hợp lệ
+          if (!result || !result.point) {
+            console.error("Invalid bot response:", result);
+            alert("Bot trả về kết quả không hợp lệ. Vui lòng thử lại!");
+            return;
+          }
+
+          // Xác định tọa độ nước đi của bot
+          let row, col;
+
+          console.log("Raw bot response:", result);
+
+          // Nếu bot thắng, lấy tọa độ từ ô cuối cùng trong win_cells
+          if (result.win && result.win_cells && result.win_cells.length > 0) {
+            const lastCell = result.win_cells[result.win_cells.length - 1];
+            row = Math.floor(lastCell / 19) + 1;
+            col = (lastCell % 19) + 1;
+            console.log("Using winning move coordinates:", {
+              row,
+              col,
+              lastCell,
             });
-            board.appendChild(cell);
+          } else if (result.row && result.col) {
+            // Nếu không phải nước thắng, sử dụng tọa độ từ result
+            // Backend trả về tọa độ 1-based nên không cần chuyển đổi
+            row = parseInt(result.row);
+            col = parseInt(result.col);
+            console.log("Using normal move coordinates:", {
+              row,
+              col,
+              rawRow: result.row,
+              rawCol: result.col,
+            });
+          } else {
+            console.error("No valid coordinates in bot response:", result);
+            alert("Bot không trả về tọa độ hợp lệ. Vui lòng thử lại!");
+            return;
+          }
+
+          // Tìm ô cờ tương ứng
+          const targetCell = document.querySelector(
+            `[data-row="${row}"][data-col="${col}"]`
+          );
+
+          if (!targetCell) {
+            console.error("Target cell not found:", { row, col });
+            alert("Không tìm thấy ô cờ cho nước đi của bot. Vui lòng thử lại!");
+            return;
+          }
+
+          if (targetCell.textContent) {
+            console.error("Target cell already occupied:", {
+              row,
+              col,
+              content: targetCell.textContent,
+              cellData: targetCell.dataset,
+            });
+            alert("Bot đánh vào ô đã có quân. Vui lòng thử lại!");
+            return;
+          }
+
+          // Xóa highlight nước đi trước
+          const lastMoveCell = document.querySelector(".last-move");
+          if (lastMoveCell) {
+            lastMoveCell.classList.remove("last-move");
+          }
+
+          // Đánh dấu nước đi của bot
+          targetCell.classList.add("last-move");
+          const piece = result.point === 1 ? "X" : "O";
+          targetCell.textContent = piece;
+
+          const lastMove = {
+            row,
+            col,
+            piece,
+          };
+
+          // Xử lý trường hợp thắng
+          if (result.win === 2 || result.win === 3) {
+            console.log("Bot win detected:", {
+              winner: result.win === 2 ? "X" : "O",
+              winCells: result.win_cells,
+            });
+
+            gameOver = true;
+            isPlayerTurn = false;
+
+            if (result.win_cells) {
+              console.log("Drawing win line:", result.win_cells);
+              drawWinLine(result.win_cells, lastMove);
+            }
+
+            setTimeout(() => {
+              alert(result.win === 2 ? "X thắng!" : "O thắng!");
+              resetBtn.style.display = "block";
+            }, 100);
+            return;
+          }
+
+          // Chuyển lượt cho người chơi
+          isPlayerTurn = true;
+          updateStatus(result.point);
+        } catch (error) {
+          console.error("Bot error:", error);
+          alert("Có lỗi xảy ra khi bot đánh. Vui lòng thử lại!");
         }
+      }
 
-        function drawWinLine(winCells) {
-            if (!winCells || winCells.length !== 5) return;
-
-            let [startRow, startCol] = winCells[0];
-            let [endRow, endCol] = winCells[4];
-
-            let startX = (startCol - 1) * totalSize + cellSize / 2 + 5;
-            let startY = (startRow - 1) * totalSize + cellSize / 2 + 5;
-            let endX = (endCol - 1) * totalSize + cellSize / 2 + 5;
-            let endY = (endRow - 1) * totalSize + cellSize / 2 + 5;
-
-            let dx = endX - startX;
-            let dy = endY - startY;
-            let length = Math.sqrt(dx * dx + dy * dy);
-            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            let line = document.createElement("div");
-            line.classList.add("win-line");
-            line.style.width = length + "px";
-            line.style.transform = `rotate(${angle}deg)`;
-            line.style.left = startX + "px";
-            line.style.top = startY + "px";
-
-            board.appendChild(line);
+      // Hàm tìm ô trống lân cận
+      function findEmptyCell() {
+        for (let row = 1; row <= 19; row++) {
+          for (let col = 1; col <= 19; col++) {
+            const cell = document.querySelector(
+              `[data-row="${row}"][data-col="${col}"]`
+            );
+            if (cell && !cell.textContent) {
+              return { row, col };
+            }
+          }
         }
+        return null;
+      }
 
-        resetBtn.addEventListener("click", async () => {
-            // let response = await fetch("/1vs1", {
-            //     method: "GET",
-            //     headers: { "Content-Type": "application/json" }
-            // });
-            
-            // let result = await response.json();
-            // if (result.success) {
-            //     location.reload();
-            // } else {
-            //     alert("Lỗi khi reset ván chơi!");
-            // }
+      // Cập nhật trạng thái game
+      function updateStatus(point) {
+        status.textContent = `Lượt tiếp theo: ${point === 1 ? "O" : "X"}`;
+      }
 
-            window.location.href = "/1vs1";
+      function drawWinLine(winCells, lastMove) {
+        console.log("=== Debug: Vẽ đường thắng ===");
+        console.log("winCells:", winCells);
+        console.log("lastMove:", lastMove);
+        console.log("Game state when drawing line:", {
+          gameOver,
+          isPlayerTurn,
         });
+
+        if (!winCells || !Array.isArray(winCells) || winCells.length !== 5) {
+          console.error("Invalid winCells data:", winCells);
+          return;
+        }
+
+        // Xóa các đường thắng cũ nếu có
+        const oldLines = document.querySelectorAll(".win-line");
+        oldLines.forEach((line) => line.remove());
+
+        // Lấy tọa độ điểm đầu và điểm cuối
+        const startCell = winCells[0];
+        const endCell = winCells[4];
+        console.log("Start cell:", startCell);
+        console.log("End cell:", endCell);
+
+        // Kiểm tra và chuyển đổi tọa độ nếu cần
+        let startRow, startCol, endRow, endCol;
+
+        // Xử lý tọa độ điểm đầu
+        if (typeof startCell === "number") {
+          // Chuyển đổi số thành tọa độ row, col (1-based)
+          startRow = Math.floor(startCell / 19) + 1; // Bỏ -1 vì backend đã dùng 0-based
+          startCol = (startCell % 19) + 1;
+        } else if (Array.isArray(startCell)) {
+          startRow = startCell[0];
+          startCol = startCell[1];
+        } else if (typeof startCell === "object" && startCell !== null) {
+          startRow = startCell.row;
+          startCol = startCell.col;
+        } else {
+          console.error("Invalid start cell format:", startCell);
+          return;
+        }
+
+        // Xử lý tọa độ điểm cuối
+        if (typeof endCell === "number") {
+          // Chuyển đổi số thành tọa độ row, col (1-based)
+          endRow = Math.floor(endCell / 19) + 1; // Bỏ -1 vì backend đã dùng 0-based
+          endCol = (endCell % 19) + 1;
+        } else if (Array.isArray(endCell)) {
+          endRow = endCell[0];
+          endCol = endCell[1];
+        } else if (typeof endCell === "object" && endCell !== null) {
+          endRow = endCell.row;
+          endCol = endCell.col;
+        } else {
+          console.error("Invalid end cell format:", endCell);
+          return;
+        }
+
+        console.log("Processed coordinates:", {
+          start: { row: startRow, col: startCol },
+          end: { row: endRow, col: endCol },
+        });
+
+        // Kiểm tra giá trị hợp lệ
+        if (
+          isNaN(startRow) ||
+          isNaN(startCol) ||
+          isNaN(endRow) ||
+          isNaN(endCol)
+        ) {
+          console.error("Invalid coordinates:", {
+            startRow,
+            startCol,
+            endRow,
+            endCol,
+          });
+          return;
+        }
+
+        // Tính toán vị trí pixel chính xác
+        const padding = 5; // Padding của bàn cờ
+        const startX =
+          (startCol - 1) * (cellSize + gapSize) + cellSize / 2 + padding;
+        const startY =
+          (startRow - 1) * (cellSize + gapSize) + cellSize / 2 + padding;
+        const endX =
+          (endCol - 1) * (cellSize + gapSize) + cellSize / 2 + padding;
+        const endY =
+          (endRow - 1) * (cellSize + gapSize) + cellSize / 2 + padding;
+
+        // Tính toán độ dài và góc của đường thẳng
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        console.log("Line properties:", {
+          startX,
+          startY,
+          endX,
+          endY,
+          length,
+          angle,
+          padding,
+          cellSize,
+          gapSize,
+        });
+
+        // Tạo và thêm đường thẳng vào bàn cờ
+        const line = document.createElement("div");
+        line.classList.add("win-line");
+        line.style.width = `${length}px`;
+        line.style.transform = `rotate(${angle}deg)`;
+        line.style.left = `${startX}px`;
+        line.style.top = `${startY}px`;
+        line.style.zIndex = "1000";
+
+        board.appendChild(line);
+
+        // Đánh dấu các ô thắng và vô hiệu hóa chúng
+        winCells.forEach((cell, index) => {
+          let row, col;
+          if (typeof cell === "number") {
+            // Chuyển đổi số thành tọa độ row, col (1-based)
+            row = Math.floor(cell / 19) + 1; // Bỏ -1 vì backend đã dùng 0-based
+            col = (cell % 19) + 1;
+          } else if (Array.isArray(cell)) {
+            row = cell[0];
+            col = cell[1];
+          } else if (typeof cell === "object" && cell !== null) {
+            row = cell.row;
+            col = cell.col;
+          } else {
+            console.error("Invalid cell format:", cell);
+            return;
+          }
+
+          console.log(`Processing winning cell ${index}:`, {
+            cell,
+            calculated: { row, col },
+          });
+
+          const targetCell = document.querySelector(
+            `[data-row="${row}"][data-col="${col}"]`
+          );
+          if (targetCell) {
+            console.log(`Found target cell ${index}:`, {
+              currentContent: targetCell.textContent,
+              hasLastMove: targetCell.classList.contains("last-move"),
+              isLastMove: row === lastMove.row && col === lastMove.col,
+            });
+
+            // Xóa class last-move nếu có
+            targetCell.classList.remove("last-move");
+            // Thêm class để đổi màu nền
+            targetCell.classList.add("winning-cell");
+            // Vô hiệu hóa sự kiện click
+            targetCell.removeEventListener("click", handleCellClick);
+
+            // Nếu là nước đi cuối cùng, đảm bảo hiển thị đúng quân cờ
+            if (row === lastMove.row && col === lastMove.col) {
+              console.log("Setting last move piece:", {
+                piece: lastMove.piece,
+                currentContent: targetCell.textContent,
+              });
+              targetCell.textContent = lastMove.piece;
+            }
+          } else {
+            console.error(`Target cell not found for ${row},${col}`);
+          }
+        });
+
+        // Vô hiệu hóa tất cả các ô còn lại và xóa sự kiện click
+        const allCells = document.querySelectorAll(".cell");
+        allCells.forEach((cell) => {
+          cell.removeEventListener("click", handleCellClick);
+          if (!cell.classList.contains("winning-cell")) {
+            cell.style.cursor = "not-allowed";
+          }
+        });
+
+        console.log("Game over - all cells disabled");
+        // Set gameOver để ngăn chặn các nước đi tiếp theo
+        gameOver = true;
+      }
+
+      resetBtn.addEventListener("click", async () => {
+        try {
+          await fetch("/1vs1/restart", { method: "POST" });
+          window.location.reload();
+        } catch (error) {
+          console.error("Lỗi:", error);
+          alert("Có lỗi xảy ra. Vui lòng thử lại!");
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
